@@ -1,3 +1,4 @@
+
 /*
 Oberalp - R&I Lab
 Logging ski scanner's data
@@ -7,24 +8,36 @@ Date: MArch 5th, 2021
 
 Setup:
  - Ski scanner shield on Adalogger
- - rotary encoder on port rot1 (closest to led)
+ - rotary encoder on port R1 (closest to led)
  
 */
 
-// include libraries needed for Adalogger
+// libraries
 #include <SPI.h> //lib for serial peripheral interface
 #include <SD.h> //lib for sd card
+#include <PS2Mouse.h>
 
 
-// rotary encoder on port rot1
+// mouse on port L2
+const int mouseData = A5;
+const int mouseClock = A4;
+PS2Mouse mouse(mouseData, mouseClock);
+
+// linear encoder on port L1
+const int lin1APin = 12;
+const int lin1BPin = 13;
+volatile long lin1Pulses = 0; // counter of pulses on lin1
+const float lin1PulsesPerCm = 66.6666;
+long lin1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
+
+// rotary encoder on port R1
 const int rot1APin = 6;
 const int rot1BPin = 9;
-long rot1Pulses = 0; // counter of pulses on rot1
+volatile long rot1Pulses = 0; // counter of pulses on rot1
 const int rot1PulsesPerRev = 500;
 long rot1Pos = 0; // angle on rot1 (deg)
 
-
-// leds and button pin declaration
+// leds and button
 const int builtinLedPin = 13; // red led onboard (used as standby indicator)
 const int externalLedPin = 20; // green led (used as recording ON indicator)
 const int buttonPin = 5;
@@ -35,12 +48,12 @@ bool oldRecording = false;
 
 // runtime choices
 const bool printSerial = true;
+const int loopDelay = 50; //ms
 
-//chipset declaration for Adalogger / sd card
-const int chipSelect = 4;
+const int chipSelect = 4; //chipset declaration for Adalogger / sd card
 
 // debouncing
-const int debounce = 200;
+const int debounce = 200; // ms
 unsigned long lastButtonPress = millis();
 
 
@@ -54,6 +67,8 @@ void setup() {
   // pin mode declaration
   pinMode(rot1APin, INPUT_PULLUP);
   pinMode(rot1BPin, INPUT_PULLUP);
+  pinMode(lin1APin, INPUT_PULLUP);
+  pinMode(lin1BPin, INPUT_PULLUP);
   
   pinMode(builtinLedPin, OUTPUT);
   pinMode(externalLedPin, OUTPUT);
@@ -62,6 +77,10 @@ void setup() {
   // interruption declarations
   attachInterrupt(digitalPinToInterrupt(buttonPin), recordingChange, FALLING); // falling because of pullup
   attachInterrupt(digitalPinToInterrupt(rot1APin), rot1Pulse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(lin1APin), lin1Pulse, CHANGE);
+
+  // mouse setup
+  mouse.begin();
 
 }
 
@@ -69,6 +88,12 @@ void loop() {
 
   // update encoders position
   rot1Pos = updateRot(rot1Pulses, rot1PulsesPerRev);
+  lin1Pos = updateLin(lin1Pulses, lin1PulsesPerCm);
+
+  // get mouse position
+  uint8_t stat;
+  int x,y;
+  mouse.getPosition(stat,x,y);
   
   // detect recording button push actioned
   if(recording != oldRecording){
@@ -92,19 +117,29 @@ void loop() {
       
     }
 
+    // update old value for flow control
     oldRecording = recording;
     
   }
 
-  
-  
-
   if (printSerial == true){
-    Serial.println(rot1Pos);
+    Serial.println("Rotary position:");
+    Serial.println(x);
+    Serial.println("Linear position:");
+    Serial.println(y);
+    
+    
+//    Serial.println("Rotary pos: " + rot1Pos);
+//    Serial.println("Linear pos: " + lin1Pulses);
   }
 
-  delay(200);
+  delay(loopDelay);
 
+}
+
+void lin1Pulse(){
+  if(digitalRead(lin1BPin) == HIGH) lin1Pulses += 1;
+  else lin1Pulses -= 1;
 }
 
 void rot1Pulse(){
@@ -112,8 +147,12 @@ void rot1Pulse(){
   else rot1Pulses -= 1;
 }
 
-long updateRot(long pulses, float ppr){
+float updateRot(long pulses, float ppr){
   return pulses * 360.0 / ppr;
+}
+
+float updateLin(long pulses, float ppcm){
+  return pulses / ppcm;
 }
 
 void recordingChange() {
