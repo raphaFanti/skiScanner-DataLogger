@@ -18,6 +18,10 @@ const bool writeSD = false;
 //chipset declaration for Adalogger / sd card
 const int chipSelect = 4;
 
+// debouncing
+const int debounce = 200;
+unsigned long lastButtonPress = millis();
+
 
 void setup() {
 
@@ -41,17 +45,14 @@ void loop() {
   // detect recording button push actioned
   if(recording != oldRecording){
 
-    // debounce
-
     // understands if at beginning or end of recording
-    if(recording == HIGH){ // beginning
+    if (recording == HIGH){ // beginning
       
       // recording light on, standby off
       digitalWrite(externalLedPin, HIGH);
       digitalWrite(builtinLedPin, LOW);
       
     } else{ // end
-
 
       // recording light off, standby on
       digitalWrite(externalLedPin, LOW);
@@ -60,6 +61,7 @@ void loop() {
     }
 
     oldRecording = recording;
+    
   }
 
   // prints serial
@@ -70,5 +72,9 @@ void loop() {
 }
 
 void recordingChange() {
-  recording = !recording;
+  const int now = millis();
+  if (now - lastButtonPress >= debounce) {
+    recording = !recording;
+    lastButtonPress = now;
+  }
 }
