@@ -3,7 +3,7 @@
 Oberalp - R&I Lab
 Logging ski scanner's data
 
-By: Raphael Fanti and Isabella Soraruf
+By: Raphael Fanti e Isabella Soraruf
 Date: MArch 5th, 2021
 
 Setup:
