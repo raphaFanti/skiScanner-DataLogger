@@ -53,12 +53,12 @@ const int loopDelay = 50; //ms
 const int chipSelect = 4; //chipset declaration for Adalogger / sd card
 
 // debouncing
-const int debounce = 200; // ms
+const int debounce = 500; // ms
 unsigned long lastButtonPress = millis();
-String filename; // create filename variable
 
 unsigned long milliseconds;
 long id = 1;
+char filename[11];
 File dataFile;
 
 void setup() {
@@ -77,7 +77,7 @@ void setup() {
   } else {
     Serial.println("Card initialised");
   }
-  delay(5000);
+  delay(1000);
   
   // pin mode declaration
   pinMode(rot1APin, INPUT_PULLUP);
@@ -100,24 +100,24 @@ void setup() {
   // Create file with file header
   // Construct filename (maxiumum digit # of filename = 12)
   
-  char filename[11];
+  // Setting new filename
   strcpy(filename, "prova00.TXT");
   for (uint8_t i = 0; i < 100; i++) {
     filename[5] = '0' + i/10;
     filename[6] = '0' + i%10;
-    // create if does not exist, do not open existing, write, sync after write
-    if (! SD.exists(filename)) {
+    //create if does not exist, do not open existing, write, sync after write
+    if (!SD.exists(filename)) {
       break;
     }
-  }
 
+  }  
+
+  // Writing file header
   dataFile = SD.open(filename,FILE_WRITE); //open file 
   
   String header = "ID, Rotary_en_1, Linear_en_1"; // file header
   
-  if (dataFile){ //if file is available write information
-    //dataFile.println(",,"); //blank line in case there where previous data
-     
+  if (dataFile){ //if file is available write information   
     dataFile.println(header); //writing header in datafile
     dataFile.close();
     Serial.println(header); // print also sensor data to Serial
@@ -125,7 +125,7 @@ void setup() {
     Serial.println("error creating datafile"); // error message if file not open
   } 
   
-  delay(5000);
+  delay(200);
 }
 
 void loop() {
@@ -145,8 +145,10 @@ void loop() {
     // understands if at beginning or end of recording
     if (recording == HIGH){ // beginning
 
-      // open file (TBD)
-      File dataFile = SD.open(filename,FILE_WRITE); //open dataFile 
+      // open file 
+      dataFile = SD.open(filename,FILE_WRITE); //open dataFile 
+      Serial.println("Starting recording to ");
+      Serial.println(filename);
       id = 1;
       
       // recording light on, standby off
@@ -157,6 +159,8 @@ void loop() {
 
       // close file (TBD)
       dataFile.close();
+      Serial.println("Ending recording to ");
+      Serial.println(filename);
 
       // recording light off, standby on
       digitalWrite(externalLedPin, LOW);
@@ -176,15 +180,17 @@ void loop() {
     Serial.println(lin1Pulses);
   }
 
+  delay(loopDelay);
+
   if (recording == HIGH){
     
-    String dataoutput = String(id) + ", " + String(rot1Pos) + ", " + String(lin1Pulses);
-    id++;
-    
+    String dataoutput = String(id) + ", " + String(rot1Pos) + ", " + String(lin1Pulses) + ",";
+        
     dataFile.println(dataoutput); //print sensor data to datafile
-      
+    
     Serial.println(dataoutput); // print also sensor data to serial
-          
+
+    id++;
     
 //    Serial.println("Rotary pos: " + rot1Pos);
 //    Serial.println("Linear pos: " + lin1Pulses);
