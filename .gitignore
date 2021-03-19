@@ -32,3 +32,4 @@
 *.app
 .DS_Store
 Post processing/.ipynb_checkpoints
+*.dxf
