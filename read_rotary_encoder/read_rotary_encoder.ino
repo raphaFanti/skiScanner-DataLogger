@@ -3,7 +3,7 @@
 Oberalp - R&I Lab
 Logging ski scanner's data
 
-By: Raphael Fanti
+By: Raphael Fanti e Isabella Soraruf
 Date: MArch 5th, 2021
 
 Setup:
@@ -15,13 +15,13 @@ Setup:
 // libraries
 #include <SPI.h> //lib for serial peripheral interface
 #include <SD.h> //lib for sd card
-#include <PS2Mouse.h>
+//#include <PS2Mouse.h>
 
 
 // mouse on port L2
 const int mouseData = A5;
 const int mouseClock = A4;
-PS2Mouse mouse(mouseData, mouseClock);
+//PS2Mouse mouse(mouseData, mouseClock);
 
 // linear encoder on port L1
 const int lin1APin = 12;
@@ -53,9 +53,13 @@ const int loopDelay = 50; //ms
 const int chipSelect = 4; //chipset declaration for Adalogger / sd card
 
 // debouncing
-const int debounce = 200; // ms
+const int debounce = 500; // ms
 unsigned long lastButtonPress = millis();
 
+unsigned long milliseconds;
+long id = 1;
+char filename[11];
+File dataFile;
 
 void setup() {
 
@@ -63,6 +67,17 @@ void setup() {
   if (printSerial == true){
     Serial.begin(9600); // start serial
   }
+  delay(3000); // waiting for serial setting
+  
+  // SD initialisation
+  
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed"); // sd card not found
+    while (1);
+  } else {
+    Serial.println("Card initialised");
+  }
+  delay(1000);
   
   // pin mode declaration
   pinMode(rot1APin, INPUT_PULLUP);
@@ -80,8 +95,37 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(lin1APin), lin1Pulse, CHANGE);
 
   // mouse setup
-  mouse.begin();
+  //mouse.begin();
+  
+  // Create file with file header
+  // Construct filename (maxiumum digit # of filename = 12)
+  
+  // Setting new filename
+  strcpy(filename, "prova00.TXT");
+  for (uint8_t i = 0; i < 100; i++) {
+    filename[5] = '0' + i/10;
+    filename[6] = '0' + i%10;
+    //create if does not exist, do not open existing, write, sync after write
+    if (!SD.exists(filename)) {
+      break;
+    }
 
+  }  
+
+  // Writing file header
+  dataFile = SD.open(filename,FILE_WRITE); //open file 
+  
+  String header = "ID, Rotary_en_1, Linear_en_1"; // file header
+  
+  if (dataFile){ //if file is available write information   
+    dataFile.println(header); //writing header in datafile
+    dataFile.close();
+    Serial.println(header); // print also sensor data to Serial
+  } else {
+    Serial.println("error creating datafile"); // error message if file not open
+  } 
+  
+  delay(200);
 }
 
 void loop() {
@@ -93,7 +137,7 @@ void loop() {
   // get mouse position
   uint8_t stat;
   int x,y;
-  mouse.getPosition(stat,x,y);
+  //mouse.getPosition(stat,x,y);
   
   // detect recording button push actioned
   if(recording != oldRecording){
@@ -101,7 +145,11 @@ void loop() {
     // understands if at beginning or end of recording
     if (recording == HIGH){ // beginning
 
-      // create file (TBD)
+      // open file 
+      dataFile = SD.open(filename,FILE_WRITE); //open dataFile 
+      Serial.println("Starting recording to ");
+      Serial.println(filename);
+      id = 1;
       
       // recording light on, standby off
       digitalWrite(externalLedPin, HIGH);
@@ -110,6 +158,9 @@ void loop() {
     } else{ // end
 
       // close file (TBD)
+      dataFile.close();
+      Serial.println("Ending recording to ");
+      Serial.println(filename);
 
       // recording light off, standby on
       digitalWrite(externalLedPin, LOW);
@@ -121,13 +172,25 @@ void loop() {
     oldRecording = recording;
     
   }
-
+  
   if (printSerial == true){
-    Serial.println("Rotary position:");
-    Serial.println(x);
-    Serial.println("Linear position:");
-    Serial.println(y);
+    Serial.print("R1 position:");
+    Serial.println(rot1Pos);
+    Serial.print("Linear pulses:");
+    Serial.println(lin1Pulses);
+  }
+
+  delay(loopDelay);
+
+  if (recording == HIGH){
     
+    String dataoutput = String(id) + ", " + String(rot1Pos) + ", " + String(lin1Pulses) + ",";
+        
+    dataFile.println(dataoutput); //print sensor data to datafile
+    
+    Serial.println(dataoutput); // print also sensor data to serial
+
+    id++;
     
 //    Serial.println("Rotary pos: " + rot1Pos);
 //    Serial.println("Linear pos: " + lin1Pulses);
