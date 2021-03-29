@@ -4,7 +4,7 @@ Oberalp - R&I Lab
 Logging ski scanner's data
 
 By: Raphael Fanti e Isabella Soraruf
-Date: MArch 5th, 2021
+Date: March 5th, 2021
 
 Setup:
  - Ski scanner shield on Adalogger
@@ -19,23 +19,39 @@ Setup:
 
 
 // mouse on port L2
-const int mouseData = A5;
-const int mouseClock = A4;
+// const int mouseData = A5;
+// const int mouseClock = A4;
 //PS2Mouse mouse(mouseData, mouseClock);
 
 // linear encoder on port L1
-const int lin1APin = 12;
-const int lin1BPin = 13;
+const int lin1APin = A4;
+const int lin1BPin = A5;
 volatile long lin1Pulses = 0; // counter of pulses on lin1
-const float lin1PulsesPerCm = 66.6666;
-long lin1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
+const float lin1PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
+float lin1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
+const float offset = 1.788; // distance between pins is offset for linear position
+
+// linear encoder on port L2
+const int lin2APin = 12;
+const int lin2BPin = A0;
+volatile long lin2Pulses = 0; // counter of pulses on lin1
+const float lin2PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
+float lin2Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
 
 // rotary encoder on port R1
 const int rot1APin = 6;
 const int rot1BPin = 9;
 volatile long rot1Pulses = 0; // counter of pulses on rot1
 const int rot1PulsesPerRev = 500;
-long rot1Pos = 0; // angle on rot1 (deg)
+float rot1Pos = 0; // angle on rot1 (deg)
+float dpc = 48.97; // degrees per centimeter (rot to lin conversion)
+
+// rotary encoder on port R2
+const int rot2APin = 11;
+const int rot2BPin = 10;
+volatile long rot2Pulses = 0; // counter of pulses on rot1
+const int rot2PulsesPerRev = 500;
+float rot2Pos = 0; // angle on rot1 (deg)
 
 // leds and button
 const int builtinLedPin = 13; // red led onboard (used as standby indicator)
@@ -49,11 +65,10 @@ bool oldRecording = false;
 // runtime choices
 const bool printSerial = true;
 const int loopDelay = 50; //ms
-
 const int chipSelect = 4; //chipset declaration for Adalogger / sd card
 
 // debouncing
-const int debounce = 500; // ms
+const int debounce = 200; // ms
 unsigned long lastButtonPress = millis();
 
 unsigned long milliseconds;
@@ -67,23 +82,17 @@ void setup() {
   if (printSerial == true){
     Serial.begin(9600); // start serial
   }
-  delay(3000); // waiting for serial setting
-  
-  // SD initialisation
-  
-  if (!SD.begin(chipSelect)) {
-    Serial.println("Card failed"); // sd card not found
-    while (1);
-  } else {
-    Serial.println("Card initialised");
-  }
-  delay(1000);
   
   // pin mode declaration
   pinMode(rot1APin, INPUT_PULLUP);
   pinMode(rot1BPin, INPUT_PULLUP);
   pinMode(lin1APin, INPUT_PULLUP);
   pinMode(lin1BPin, INPUT_PULLUP);
+
+  pinMode(rot2APin, INPUT_PULLUP);
+  pinMode(rot2BPin, INPUT_PULLUP);
+  pinMode(lin2APin, INPUT_PULLUP);
+  pinMode(lin2BPin, INPUT_PULLUP);
   
   pinMode(builtinLedPin, OUTPUT);
   pinMode(externalLedPin, OUTPUT);
@@ -92,10 +101,22 @@ void setup() {
   // interruption declarations
   attachInterrupt(digitalPinToInterrupt(buttonPin), recordingChange, FALLING); // falling because of pullup
   attachInterrupt(digitalPinToInterrupt(rot1APin), rot1Pulse, FALLING);
-  attachInterrupt(digitalPinToInterrupt(lin1APin), lin1Pulse, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(lin1APin), lin1Pulse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(rot2APin), rot2Pulse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(lin2APin), lin2Pulse, FALLING);
+
 
   // mouse setup
   //mouse.begin();
+  // SD initialisation
+  
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed"); // sd card not found
+    while (1);
+  } else {
+    Serial.println("Card initialised");
+  }
+  // delay(1000);
   
   // Create file with file header
   // Construct filename (maxiumum digit # of filename = 12)
@@ -115,7 +136,7 @@ void setup() {
   // Writing file header
   dataFile = SD.open(filename,FILE_WRITE); //open file 
   
-  String header = "ID, Rotary_en_1, Linear_en_1"; // file header
+  String header = "ID, L1, W1, L2, W2"; // file header
   
   if (dataFile){ //if file is available write information   
     dataFile.println(header); //writing header in datafile
@@ -133,6 +154,8 @@ void loop() {
   // update encoders position
   rot1Pos = updateRot(rot1Pulses, rot1PulsesPerRev);
   lin1Pos = updateLin(lin1Pulses, lin1PulsesPerCm);
+  rot2Pos = updateRot(rot2Pulses, rot2PulsesPerRev);
+  lin2Pos = updateLin(lin2Pulses, lin2PulsesPerCm);
 
   // get mouse position
   uint8_t stat;
@@ -174,26 +197,31 @@ void loop() {
   }
   
   if (printSerial == true){
-    Serial.print("R1 position:");
-    Serial.println(rot1Pos);
-    Serial.print("Linear pulses:");
-    Serial.println(lin1Pulses);
+    
+      Serial.println("Rotary pos1: " + String(rot1Pulses) + "  " + String(rot1Pos));
+      Serial.println("Linear pos1: " + String(lin1Pulses) + "  " + String(lin1Pos));
+      Serial.println("Length1: " + String(rot1Pos/dpc));
+      Serial.println("Width1: " + String(offset + lin1Pos));
+      
+      Serial.println("Rotary pos2: " + String(rot2Pulses) + "  " + String(rot2Pos));
+      Serial.println("Linear pos2: " + String(lin2Pulses) + "  " + String(lin2Pos));
+      Serial.println("Length2: " + String(rot2Pos/dpc));
+      Serial.println("Width2: " + String(offset + lin2Pos));
+      
   }
 
-  delay(loopDelay);
+  // delay(loopDelay);
 
   if (recording == HIGH){
     
-    String dataoutput = String(id) + ", " + String(rot1Pos) + ", " + String(lin1Pulses) + ",";
+    String dataoutput = String(id) + ", " + String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc) + ", " + String(offset + lin2Pos) + ",";
         
     dataFile.println(dataoutput); //print sensor data to datafile
     
     Serial.println(dataoutput); // print also sensor data to serial
 
     id++;
-    
-//    Serial.println("Rotary pos: " + rot1Pos);
-//    Serial.println("Linear pos: " + lin1Pulses);
+ 
   }
 
   delay(loopDelay);
@@ -208,6 +236,16 @@ void lin1Pulse(){
 void rot1Pulse(){
   if(digitalRead(rot1BPin) == HIGH) rot1Pulses += 1;
   else rot1Pulses -= 1;
+}
+
+void lin2Pulse(){
+  if(digitalRead(lin2BPin) == HIGH) lin2Pulses += 1;
+  else lin2Pulses -= 1;
+}
+
+void rot2Pulse(){
+  if(digitalRead(rot2BPin) == HIGH) rot2Pulses += 1;
+  else rot2Pulses -= 1;
 }
 
 float updateRot(long pulses, float ppr){
