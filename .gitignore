@@ -31,7 +31,7 @@
 *.out
 *.app
 .DS_Store
-*/ipynb_checkpoints
+ipynb_checkpoints
 
 *.dxf
 *.ipynb_checkpoints
