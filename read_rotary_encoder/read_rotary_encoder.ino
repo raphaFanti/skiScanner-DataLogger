@@ -33,7 +33,7 @@ const float offset = 1.788; // distance between pins is offset for linear positi
 
 // linear encoder on port L2
 const int lin2APin = 12;
-const int lin2BPin = A0;
+const int lin2BPin = 13;
 volatile long lin2Pulses = 0; // counter of pulses on lin1
 const float lin2PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
 float lin2Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
@@ -74,6 +74,7 @@ unsigned long lastButtonPress = millis();
 unsigned long milliseconds;
 long id = 1;
 char filename[11];
+String dataoutput_old;
 File dataFile;
 
 void setup() {
@@ -136,7 +137,7 @@ void setup() {
   // Writing file header
   dataFile = SD.open(filename,FILE_WRITE); //open file 
   
-  String header = "ID, L1, W1, L2, W2"; // file header
+  String header = "ID,timestamps,L1,W1,L2,W2,"; // file header
   
   if (dataFile){ //if file is available write information   
     dataFile.println(header); //writing header in datafile
@@ -170,9 +171,19 @@ void loop() {
 
       // open file 
       dataFile = SD.open(filename,FILE_WRITE); //open dataFile 
-      Serial.println("Starting recording to ");
+      Serial.println("Starting_recording,");
       Serial.println(filename);
       id = 1;
+      
+      // reset incremental encoders
+      lin1Pulses = 0;
+      lin1Pos = 0;
+      lin2Pulses = 0;
+      lin2Pos = 0;
+      rot1Pulses = 0; 
+      rot1Pos = 0;
+      rot2Pulses = 0; 
+      rot2Pos = 0;
       
       // recording light on, standby off
       digitalWrite(externalLedPin, HIGH);
@@ -182,7 +193,7 @@ void loop() {
 
       // close file (TBD)
       dataFile.close();
-      Serial.println("Ending recording to ");
+      Serial.println("Ending_recording,");
       Serial.println(filename);
 
       // recording light off, standby on
@@ -210,17 +221,22 @@ void loop() {
       
   }
 
-  // delay(loopDelay);
-
   if (recording == HIGH){
-    
-    String dataoutput = String(id) + ", " + String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc) + ", " + String(offset + lin2Pos) + ",";
-        
-    dataFile.println(dataoutput); //print sensor data to datafile
-    
-    Serial.println(dataoutput); // print also sensor data to serial
 
-    id++;
+    unsigned long timestamp = millis();
+    String dataoutput = String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc) + ", " + String(offset + lin2Pos) + ",";
+    String dataoutput_id = "ID," + String(id) + ", " + String(timestamp) + ", " + String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc) + ", " + String(offset + lin2Pos) + ",";
+   
+    Serial.println(dataoutput_id); //Da cancellare
+    id++; //Da cancellare
+    
+    if (dataoutput.equals(dataoutput_old) != true){
+      dataFile.println(dataoutput_id); //print sensor data to datafile
+      Serial.println(dataoutput_id); // print also sensor data to serial
+
+      id++;
+      dataoutput_old = dataoutput;
+    }
  
   }
 
