@@ -24,16 +24,16 @@ Setup:
 //PS2Mouse mouse(mouseData, mouseClock);
 
 // linear encoder on port L1
-const int lin1APin = A4;
-const int lin1BPin = A5;
+const int lin1APin = 12;
+const int lin1BPin = 13;
 volatile long lin1Pulses = 0; // counter of pulses on lin1
 const float lin1PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
 float lin1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
 const float offset = 1.788; // distance between pins is offset for linear position
 
 // linear encoder on port L2
-const int lin2APin = 12;
-const int lin2BPin = 13;
+const int lin2APin = A4;
+const int lin2BPin = A5;
 volatile long lin2Pulses = 0; // counter of pulses on lin1
 const float lin2PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
 float lin2Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
@@ -54,7 +54,7 @@ const int rot2PulsesPerRev = 500;
 float rot2Pos = 0; // angle on rot1 (deg)
 
 // leds and button
-const int builtinLedPin = 13; // red led onboard (used as standby indicator)
+//const int builtinLedPin = 13; // red led onboard (used as standby indicator) //this can't be done because pin 13 is also used as input in lin1BPin
 const int externalLedPin = 20; // green led (used as recording ON indicator)
 const int buttonPin = 5;
 
@@ -95,7 +95,7 @@ void setup() {
   pinMode(lin2APin, INPUT_PULLUP);
   pinMode(lin2BPin, INPUT_PULLUP);
   
-  pinMode(builtinLedPin, OUTPUT);
+  //pinMode(builtinLedPin, OUTPUT); //this can't be done because pin 13 is also used as input in lin1BPin
   pinMode(externalLedPin, OUTPUT);
   pinMode(buttonPin, INPUT_PULLUP);
 
@@ -187,7 +187,7 @@ void loop() {
       
       // recording light on, standby off
       digitalWrite(externalLedPin, HIGH);
-      digitalWrite(builtinLedPin, LOW);
+      //digitalWrite(builtinLedPin, LOW); //this can't be done because pin 13 is also used as input in lin1BPin
       
     } else{ // end
 
@@ -198,7 +198,7 @@ void loop() {
 
       // recording light off, standby on
       digitalWrite(externalLedPin, LOW);
-      digitalWrite(builtinLedPin, HIGH);
+      //digitalWrite(builtinLedPin, HIGH); //this can't be done because pin 13 is also used as input in lin1BPin
       
     }
 
