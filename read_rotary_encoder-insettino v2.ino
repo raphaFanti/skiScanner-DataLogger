@@ -29,14 +29,14 @@ const int lin1BPin = 13;
 volatile long lin1Pulses = 0; // counter of pulses on lin1
 const float lin1PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
 float lin1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
-const float offset = 5.4 ; // distance between pins is offset for linear position
+const float offset = 1.788; // distance between pins is offset for linear position
 
 // linear encoder on port L2
 const int lin2APin = A4;
 const int lin2BPin = A5;
 volatile long lin2Pulses = 0; // counter of pulses on lin1
 const float lin2PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
-float lin2Pos = 0; // (initial) position of lin2 (initial distance between arms cylinders surfaces)
+float lin2Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
 
 // rotary encoder on port R1
 const int rot1APin = 6;
@@ -44,7 +44,7 @@ const int rot1BPin = 9;
 volatile long rot1Pulses = 0; // counter of pulses on rot1
 const int rot1PulsesPerRev = 500;
 float rot1Pos = 0; // angle on rot1 (deg)
-float dpc = 46.6704; // degrees per centimeter (rot to lin conversion) BIG WHEEL
+float dpc = 48.97; // degrees per centimeter (rot to lin conversion)
 
 // rotary encoder on port R2
 const int rot2APin = 11;
@@ -52,7 +52,6 @@ const int rot2BPin = 10;
 volatile long rot2Pulses = 0; // counter of pulses on rot1
 const int rot2PulsesPerRev = 500;
 float rot2Pos = 0; // angle on rot1 (deg)
-float dpc2 = 45.6528; //48.97;  degrees per centimeter (rot to lin conversion) SMALL WHEEL
 
 // leds and button
 //const int builtinLedPin = 13; // red led onboard (used as standby indicator) //this can't be done because pin 13 is also used as input in lin1BPin
@@ -217,7 +216,7 @@ void loop() {
       
       Serial.println("Rotary pos2: " + String(rot2Pulses) + "  " + String(rot2Pos));
       Serial.println("Linear pos2: " + String(lin2Pulses) + "  " + String(lin2Pos));
-      Serial.println("Length2: " + String(rot2Pos/dpc2));
+      Serial.println("Length2: " + String(rot2Pos/dpc));
       Serial.println("Width2: " + String(offset + lin2Pos));
       
   }
@@ -225,11 +224,11 @@ void loop() {
   if (recording == HIGH){
 
     unsigned long timestamp = millis();
-    String dataoutput = String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc2) + ", " + String(offset + lin2Pos) + ",";
-    String dataoutput_id = "ID," + String(id) + ", " + String(timestamp) + ", " + String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc2) + ", " + String(offset + lin2Pos) + ",";
+    String dataoutput = String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc) + ", " + String(offset + lin2Pos) + ",";
+    String dataoutput_id = "ID," + String(id) + ", " + String(timestamp) + ", " + String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc) + ", " + String(offset + lin2Pos) + ",";
    
-    //Serial.println(dataoutput_id); //Da cancellare
-    //id++; //Da cancellare
+    Serial.println(dataoutput_id); //Da cancellare
+    id++; //Da cancellare
     
     if (dataoutput.equals(dataoutput_old) != true){
       dataFile.println(dataoutput_id); //print sensor data to datafile
