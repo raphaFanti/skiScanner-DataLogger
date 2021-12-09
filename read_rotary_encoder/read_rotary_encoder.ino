@@ -5,6 +5,7 @@ Logging ski scanner's data
 
 By: Raphael Fanti e Isabella Soraruf
 Date: March 5th, 2021
+Last update: December 9th, 2021
 
 Setup:
  - Ski scanner shield on Adalogger
@@ -17,42 +18,30 @@ Setup:
 #include <SD.h> //lib for sd card
 //#include <PS2Mouse.h>
 
+// rotary encoder on port L1 (schematics L1) rotary sensor
+const int wrot1APin = A4; // 
+const int wrot1BPin = A5; // 
+volatile long wrot1Pulses = 0; // counter 
+const int wrot1PulsesPerRev = 8192;
+float wrot1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
 
-// mouse on port L2
-// const int mouseData = A5;
-// const int mouseClock = A4;
-//PS2Mouse mouse(mouseData, mouseClock);
+const float width_offset = 5.56 ; //latest version: 58.6 // distance between pins is offset for linear position
 
-// linear encoder on port L1
-const int lin1APin = 12;
-const int lin1BPin = 13;
-volatile long lin1Pulses = 0; // counter of pulses on lin1
-const float lin1PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
-float lin1Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
-const float offset = 5.4 ; // distance between pins is offset for linear position
+// rotary encoder on port W2 (schematics W2) linear width sensor 2
+const int wrot2APin = 6; // 12; 
+const int wrot2BPin = 9; // 13;  
+volatile long wrot2Pulses = 0; // counter of pulses
+const int wrot2PulsesPerRev = 8192;
+float wrot2Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
 
-// linear encoder on port L2
-const int lin2APin = A4;
-const int lin2BPin = A5;
-volatile long lin2Pulses = 0; // counter of pulses on lin1
-const float lin2PulsesPerCm = 249.4; //acquired manually on 10 cm on sensor
-float lin2Pos = 0; // (initial) position of lin2 (initial distance between arms cylinders surfaces)
+// rotary encoder on port W1 (schematics W1) linear width sensor 1
+const int wrot3APin = 10; //6;  
+const int wrot3BPin = 11; //9;  
+volatile long wrot3Pulses = 0; // counter of pulses
+const int wrot3PulsesPerRev = 8192;
+float wrot3Pos = 0; // (initial) position of lin1 (initial distance between arms cylinders surfaces)
 
-// rotary encoder on port R1
-const int rot1APin = 6;
-const int rot1BPin = 9;
-volatile long rot1Pulses = 0; // counter of pulses on rot1
-const int rot1PulsesPerRev = 500;
-float rot1Pos = 0; // angle on rot1 (deg)
-float dpc = 46.6704; // degrees per centimeter (rot to lin conversion) BIG WHEEL
-
-// rotary encoder on port R2
-const int rot2APin = 11;
-const int rot2BPin = 10;
-volatile long rot2Pulses = 0; // counter of pulses on rot1
-const int rot2PulsesPerRev = 500;
-float rot2Pos = 0; // angle on rot1 (deg)
-float dpc2 = 45.6528; //48.97;  degrees per centimeter (rot to lin conversion) SMALL WHEEL
+float dpc = 38.20; // latest version: 38.20 degrees per centimeter // 46.84084; 47.9808; 48.97;  degrees per centimeter (rot to lin conversion) SMALL WHEEL
 
 // leds and button
 //const int builtinLedPin = 13; // red led onboard (used as standby indicator) //this can't be done because pin 13 is also used as input in lin1BPin
@@ -83,18 +72,24 @@ void setup() {
   // start serial comm
   if (printSerial == true){
     Serial.begin(9600); // start serial
+    // reset incremental encoders
+      wrot1Pulses = 0;
+      wrot1Pos = 0;
+      wrot2Pulses = 0;
+      wrot2Pos = 0;
+      wrot3Pulses = 0; 
+      wrot3Pos = 0;
   }
   
   // pin mode declaration
-  pinMode(rot1APin, INPUT_PULLUP);
-  pinMode(rot1BPin, INPUT_PULLUP);
-  pinMode(lin1APin, INPUT_PULLUP);
-  pinMode(lin1BPin, INPUT_PULLUP);
+  pinMode(wrot1APin, INPUT_PULLUP);
+  pinMode(wrot1BPin, INPUT_PULLUP);
+  
+  pinMode(wrot2APin, INPUT_PULLUP);
+  pinMode(wrot2BPin, INPUT_PULLUP);
 
-  pinMode(rot2APin, INPUT_PULLUP);
-  pinMode(rot2BPin, INPUT_PULLUP);
-  pinMode(lin2APin, INPUT_PULLUP);
-  pinMode(lin2BPin, INPUT_PULLUP);
+  pinMode(wrot3APin, INPUT_PULLUP);
+  pinMode(wrot3BPin, INPUT_PULLUP);
   
   //pinMode(builtinLedPin, OUTPUT); //this can't be done because pin 13 is also used as input in lin1BPin
   pinMode(externalLedPin, OUTPUT);
@@ -102,15 +97,9 @@ void setup() {
 
   // interruption declarations
   attachInterrupt(digitalPinToInterrupt(buttonPin), recordingChange, FALLING); // falling because of pullup
-  attachInterrupt(digitalPinToInterrupt(rot1APin), rot1Pulse, FALLING);
-  attachInterrupt(digitalPinToInterrupt(lin1APin), lin1Pulse, FALLING);
-  attachInterrupt(digitalPinToInterrupt(rot2APin), rot2Pulse, FALLING);
-  attachInterrupt(digitalPinToInterrupt(lin2APin), lin2Pulse, FALLING);
-
-
-  // mouse setup
-  //mouse.begin();
-  // SD initialisation
+  attachInterrupt(digitalPinToInterrupt(wrot1APin), wrot1Pulse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(wrot2APin), wrot2Pulse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(wrot3APin), wrot3Pulse, FALLING);
   
   if (!SD.begin(chipSelect)) {
     Serial.println("Card failed"); // sd card not found
@@ -119,57 +108,50 @@ void setup() {
     Serial.println("Card initialised");
   }
   // delay(1000);
-  
-  // Create file with file header
-  // Construct filename (maxiumum digit # of filename = 12)
-  
-  // Setting new filename
-  strcpy(filename, "prova00.TXT");
-  for (uint8_t i = 0; i < 100; i++) {
-    filename[5] = '0' + i/10;
-    filename[6] = '0' + i%10;
-    //create if does not exist, do not open existing, write, sync after write
-    if (!SD.exists(filename)) {
-      break;
-    }
-
-  }  
-
-  // Writing file header
-  dataFile = SD.open(filename,FILE_WRITE); //open file 
-  
-  String header = "ID,timestamps,L1,W1,L2,W2,"; // file header
-  
-  if (dataFile){ //if file is available write information   
-    dataFile.println(header); //writing header in datafile
-    dataFile.close();
-    Serial.println(header); // print also sensor data to Serial
-  } else {
-    Serial.println("error creating datafile"); // error message if file not open
-  } 
-  
   delay(200);
 }
 
 void loop() {
 
   // update encoders position
-  rot1Pos = updateRot(rot1Pulses, rot1PulsesPerRev);
-  lin1Pos = updateLin(lin1Pulses, lin1PulsesPerCm);
-  rot2Pos = updateRot(rot2Pulses, rot2PulsesPerRev);
-  lin2Pos = updateLin(lin2Pulses, lin2PulsesPerCm);
-
-  // get mouse position
-  uint8_t stat;
-  int x,y;
-  //mouse.getPosition(stat,x,y);
+  wrot1Pos = updateRot(wrot1Pulses, wrot1PulsesPerRev);
+  wrot2Pos = updateRot(wrot2Pulses, wrot2PulsesPerRev);
+  wrot3Pos = updateRot(wrot3Pulses, wrot3PulsesPerRev);
   
   // detect recording button push actioned
   if(recording != oldRecording){
 
     // understands if at beginning or end of recording
     if (recording == HIGH){ // beginning
-
+      
+        // Create file with file header
+        // Construct filename (maxiumum digit # of filename = 12)
+        
+        // Setting new filename
+        strcpy(filename, "prova00.TXT");
+        for (uint8_t i = 0; i < 100; i++) {
+          filename[5] = '0' + i/10;
+          filename[6] = '0' + i%10;
+          //create if does not exist, do not open existing, write, sync after write
+          if (!SD.exists(filename)) {
+            break;
+          }
+      
+        }  
+      
+        // Writing file header
+        dataFile = SD.open(filename,FILE_WRITE); //open file 
+        
+        String header = "ID,timestamps,L1,W2,W1,"; // file header
+        
+        if (dataFile){ //if file is available write information   
+          dataFile.println(header); //writing header in datafile
+          dataFile.close();
+          Serial.println(header); // print also sensor data to Serial
+        } else {
+          Serial.println("error creating datafile"); // error message if file not open
+        } 
+  
       // open file 
       dataFile = SD.open(filename,FILE_WRITE); //open dataFile 
       Serial.println("Starting_recording,");
@@ -177,18 +159,15 @@ void loop() {
       id = 1;
       
       // reset incremental encoders
-      lin1Pulses = 0;
-      lin1Pos = 0;
-      lin2Pulses = 0;
-      lin2Pos = 0;
-      rot1Pulses = 0; 
-      rot1Pos = 0;
-      rot2Pulses = 0; 
-      rot2Pos = 0;
+      wrot1Pulses = 0;
+      wrot1Pos = 0;
+      wrot2Pulses = 0;
+      wrot2Pos = 0;
+      wrot3Pulses = 0; 
+      wrot3Pos = 0;
       
-      // recording light on, standby off
+      // recording light on
       digitalWrite(externalLedPin, HIGH);
-      //digitalWrite(builtinLedPin, LOW); //this can't be done because pin 13 is also used as input in lin1BPin
       
     } else{ // end
 
@@ -197,9 +176,8 @@ void loop() {
       Serial.println("Ending_recording,");
       Serial.println(filename);
 
-      // recording light off, standby on
+      // recording light off
       digitalWrite(externalLedPin, LOW);
-      //digitalWrite(builtinLedPin, HIGH); //this can't be done because pin 13 is also used as input in lin1BPin
       
     }
 
@@ -209,30 +187,25 @@ void loop() {
   }
   
   if (printSerial == true){
-    
-      Serial.println("Rotary pos1: " + String(rot1Pulses) + "  " + String(rot1Pos));
-      Serial.println("Linear pos1: " + String(lin1Pulses) + "  " + String(lin1Pos));
-      Serial.println("Length1: " + String(rot1Pos/dpc));
-      Serial.println("Width1: " + String(offset + lin1Pos));
       
-      Serial.println("Rotary pos2: " + String(rot2Pulses) + "  " + String(rot2Pos));
-      Serial.println("Linear pos2: " + String(lin2Pulses) + "  " + String(lin2Pos));
-      Serial.println("Length2: " + String(rot2Pos/dpc2));
-      Serial.println("Width2: " + String(offset + lin2Pos));
-      
+      Serial.println("Rotary pos1 (width1): " + String(wrot1Pulses) + "  " + String(wrot1Pos));
+      Serial.println("Rotary pos2 (width2): " + String(wrot2Pulses) + "  " + String(wrot2Pos));
+      Serial.println("Rotary pos3 (advancement): " + String(wrot3Pulses) + "  " + String(wrot3Pos));
+  
   }
 
   if (recording == HIGH){
 
     unsigned long timestamp = millis();
-    String dataoutput = String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc2) + ", " + String(offset + lin2Pos) + ",";
-    String dataoutput_id = "ID," + String(id) + ", " + String(timestamp) + ", " + String(rot1Pos/dpc) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos/dpc2) + ", " + String(offset + lin2Pos) + ",";
-   
+    String dataoutput = String(wrot1Pulses) + ", " + String(wrot2Pulses) + ", " + String(wrot3Pulses) + "," ; //String(rot1Pos) + ", " + String(offset + lin1Pos) + ", " + String(rot2Pos) + ", " + String(offset + lin2Pos) + ",";
+    String dataoutput_id = "ID," + String(id) + ", " + String(timestamp) + ", " + String(wrot1Pulses) + ", " + String(wrot2Pulses) + ", " + String(wrot3Pulses) + "," ; //+ String(offset + lin2Pos) + ","
+    String dataoutput_sd = String(id) + ", " + String(timestamp) + ", " + String(wrot1Pulses) + ", " + String(wrot2Pulses) + ", " + String(wrot3Pulses) + "," ;
+    
     //Serial.println(dataoutput_id); //Da cancellare
     //id++; //Da cancellare
     
     if (dataoutput.equals(dataoutput_old) != true){
-      dataFile.println(dataoutput_id); //print sensor data to datafile
+      dataFile.println(dataoutput_sd); //print sensor data to datafile
       Serial.println(dataoutput_id); // print also sensor data to serial
 
       id++;
@@ -245,32 +218,23 @@ void loop() {
 
 }
 
-void lin1Pulse(){
-  if(digitalRead(lin1BPin) == HIGH) lin1Pulses += 1;
-  else lin1Pulses -= 1;
+void wrot1Pulse(){
+  if(digitalRead(wrot1BPin) == HIGH) wrot1Pulses += 1;
+  else wrot1Pulses -= 1;
 }
 
-void rot1Pulse(){
-  if(digitalRead(rot1BPin) == HIGH) rot1Pulses += 1;
-  else rot1Pulses -= 1;
+void wrot2Pulse(){
+  if(digitalRead(wrot2BPin) == HIGH) wrot2Pulses += 1;
+  else wrot2Pulses -= 1;
 }
 
-void lin2Pulse(){
-  if(digitalRead(lin2BPin) == HIGH) lin2Pulses += 1;
-  else lin2Pulses -= 1;
-}
-
-void rot2Pulse(){
-  if(digitalRead(rot2BPin) == HIGH) rot2Pulses += 1;
-  else rot2Pulses -= 1;
+void wrot3Pulse(){
+  if(digitalRead(wrot3BPin) == HIGH) wrot3Pulses += 1;
+  else wrot3Pulses -= 1;
 }
 
 float updateRot(long pulses, float ppr){
   return pulses * 360.0 / ppr;
-}
-
-float updateLin(long pulses, float ppcm){
-  return pulses / ppcm;
 }
 
 void recordingChange() {
